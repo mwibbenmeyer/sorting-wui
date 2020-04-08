@@ -1,0 +1,16 @@
+processing/**
+processing_complete/**
+raw_data/**
+.Rhistory
+.RData
+**.html
+**.md
+**.pdf
+**.png
+**.db
+**.gph
+**.svg
+**.eps
+**.RData
+*.Rproj
+.Rproj.user
