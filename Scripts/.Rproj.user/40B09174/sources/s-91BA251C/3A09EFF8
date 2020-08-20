@@ -1,0 +1,26 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1592949617665.000,
+    "dirty" : true,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "3A09EFF8",
+    "lastKnownWriteTime" : 1593116350,
+    "last_content_update" : 1593186931041,
+    "path" : "~/Desktop/GithubProjects/propval-wui/sorting-wui/Scripts/Beginning_study.R",
+    "project_path" : "Beginning_study.R",
+    "properties" : {
+        "cursorPosition" : "129,21",
+        "scrollLine" : "102",
+        "tempName" : "Untitled1"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
