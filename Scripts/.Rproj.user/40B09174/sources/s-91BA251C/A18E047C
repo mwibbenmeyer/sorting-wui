@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1592949544808.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "A18E047C",
+    "lastKnownWriteTime" : 1592928991,
+    "last_content_update" : 1592928991,
+    "path" : "~/Desktop/GithubProjects/propval-wui/sorting-wui/Scripts/full_merge_11062018.r",
+    "project_path" : "full_merge_11062018.r",
+    "properties" : {
+        "cursorPosition" : "25,11",
+        "scrollLine" : "0"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
