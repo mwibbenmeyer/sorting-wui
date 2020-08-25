@@ -181,17 +181,7 @@ for(i in 1:length(state.id)){
       zilint1 = left_join(zilint1, tbl(database, 'bldg'), by = 'RowID')
       zilint1 = zilint1 %>% filter(PropertyLandUseStndCode %in% c('RR101',  # SFR
                                             'RR999',  # Inferred SFR
-                                           'RR102',  # Rural Residence   (includes farm/productive land?)
-                                            'RR104',  # Townhouse
-                                            'RR105',  # Cluster Home
-                                            'RR106',  # Condominium
-                                            'RR107',  # Cooperative
-                                            'RR108',  # Row House
-                                            'RR109',  # Planned Unit Development
-                                            'RR113',  # Bungalow
-                                            'RR116',  # Patio Home
-                                            'RR119',  # Garden Home
-                                            'RR120'), # Landominium
+                                           'RR102')  # Rural Residence   (includes farm/productive land?)
              )
       
       zillowSQL3 = zilint1 %>% dplyr::select(PropertyAddressLatitude, PropertyAddressLongitude, ImportParcelID, TransId, LenderDBAName, LenderIDStndCode) %>% collect() %>% as.data.table()
@@ -262,7 +252,7 @@ for(i in 1:length(state.id)){
       #for 1990 tracts. NA sub for 00
       if(year.id[k] > 2017){
         zillow_tract <- st_join(cord.UTM, tracts2010, join = st_within)
-        zillow_tract$id_number = paste0(zillow_tract$COUNTY, zillow_tract$TRACT)
+        zillow_tract$id_number = paste0(zillow_tract$STATE,zillow_tract$COUNTY, zillow_tract$TRACT)
       }
       if(year.id[k] %in% c(2012:2017)){
         zillow_tract <- st_join(cord.UTM, tracts2010, join = st_within)
@@ -310,6 +300,14 @@ for(i in 1:length(state.id)){
       table_name = paste('lar', year.id[[k]], sep = '_')
       hmda = tbl(hmda_database, in_schema('hmda_public',table_name)) %>% collect()
       
+      if(year.id[[k]] %in% c(year.id[[1]]:2017)){
+        hmda$respondent_id_prop = stri_join(hmda$agency_code, hmda$respondent_id, sep = '')
+      }
+      
+      if(year.id[[k]] > 2017){
+        hmda$respondent_id_prop = hmda$lei
+      }
+
       # Keep only home purchases and create LoanAmount column to match Zillow's
       hmda$LoanAmount <- hmda$loan_amount %>% as.numeric() * 1000
       
@@ -320,8 +318,11 @@ for(i in 1:length(state.id)){
       
       hmda$county_code <- as.character(hmda$county_code)
       
-      hmda$id_number <- paste(hmda$county_code, hmda$census_tract, sep = '')
-      
+      if(year.id[[k]] < 2018){
+        hmda$id_number <- paste(hmda$county_code, hmda$census_tract, sep = '')
+      } else{
+        hmda$id_number = hmda$census_tract
+      }
       # Drop loans without identifiers
       hmda <- hmda[which(hmda$id_number != 'NA'
                          & !is.na(hmda$LoanAmount)), ]
@@ -350,13 +351,19 @@ for(i in 1:length(state.id)){
       hmda2[,names(hmda2) := lapply(.SD, trimws), .SDcols = names(hmda2)]
       hmda2$LoanAmount %<>% as.numeric()
       zillow3$LoanAmount %<>% as.numeric()
-
+      
+      if(year.id[[k]] > 2017){
+        hmda2$loan_amount %<>% as.numeric()
+      hmda2[,LoanAmount := loan_amount]
+      hmda2[,loan_amount := round(loan_amount/1000)]
+      
+      }
       merge1 <- merge(zillow3, hmda2, 
                       by.x = c("id_number", "LoanAmount"),
                       by.y = c("id_number", "LoanAmount"), .keep_all = TRUE)
 
       #coord = merge1$geometry
-      merge1 %<>%mutate(loan_amount = loan_amount.x) %>% select(-c('loan_amount.x', 'loan_amount.y')) %>% st_as_sf()
+      merge1 %<>%  st_as_sf()
       coord = st_coordinates(merge1)
       merge1 %<>% as.data.table() %>% select(-geometry)
       merge1 = cbind(merge1, coord)
@@ -367,7 +374,7 @@ for(i in 1:length(state.id)){
                       by.x = c("id_number", "loan_amount"),
                       by.y = c("id_number", "loan_amount"))
       #merge1$geometry
-      merge12 %<>% mutate(LoanAmount = LoanAmount.x) %>% select(-c('LoanAmount.x', 'LoanAmount.y')) %>% st_as_sf()
+      merge12 %<>%  st_as_sf()
       coord = st_coordinates(merge12)
       merge12 %<>% as.data.table() %>% select(-geometry)
       merge12 = cbind(merge12, coord)
@@ -375,10 +382,10 @@ for(i in 1:length(state.id)){
       p_load(sf)
       merge1 = rbind(merge1,merge12) %>% unique()
       
-      # SECOND: merge by respondent_id, LoanAmount, and LenderName
+      # SECOND: merge by respondent_id_prop, LoanAmount, and LenderName
       rm(hmda2)
-      # Create database of LenderName using respondent_id
-      lendername <- subset(merge1, select = c(LenderName, respondent_id, activity_year)) %>% as.data.table() %>% dplyr::select(LenderName, respondent_id, activity_year)
+      # Create database of LenderName using respondent_id_prop
+      lendername <- subset(merge1, select = c(LenderName, respondent_id_prop, activity_year)) %>% as.data.table() %>% dplyr::select(LenderName, respondent_id_prop, activity_year)
       lendername_dictionary = rbind(lendername, lendername_dictionary)
       lendername_dictionary = unique(lendername_dictionary)
       if(!exists('merge1_store')){
@@ -537,6 +544,14 @@ for(i in 1:length(state.id)){
       table_name = paste('lar', year.id[[j]], sep = '_')
       hmda = tbl(hmda_database, in_schema('hmda_public',table_name)) %>% collect() %>% as.data.table()
       
+      if(year.id[[j]] %in% c(year.id[[1]]:2017)){
+        hmda$respondent_id_prop = stri_join(hmda$agency_code, hmda$respondent_id, sep = '')
+      }
+      
+      if(year.id[[j]] > 2017){
+        hmda$respondent_id_prop = hmda$lei
+      }
+
       # Keep only home purchases and create LoanAmount column to match Zillow's
       hmda$LoanAmount <- hmda$loan_amount %>% as.numeric() * 1000
       
@@ -546,9 +561,11 @@ for(i in 1:length(state.id)){
       hmda$county_code <- paste(formatC(hmda$county_code, width = 3, flag = "0"), sep = "")
       
       hmda$county_code <- as.character(hmda$county_code)
-      
-      hmda$id_number <- paste(hmda$county_code, hmda$census_tract, sep = '')
-      
+       if(year.id[[j]] < 2018){
+        hmda$id_number <- paste(hmda$county_code, hmda$census_tract, sep = '')
+      } else{
+        hmda$id_number = hmda$census_tract
+      }
       # Drop loans without identifiers
       hmda <- hmda[which(hmda$id_number != 'NA'
                          & !is.na(hmda$LoanAmount)), ]
@@ -577,11 +594,11 @@ for(i in 1:length(state.id)){
       zillow3$LoanAmount %<>% as.numeric()
       hmda2$LoanAmount %<>% as.numeric()
       
-     merge1 <- merge(zillow3, hmda2, 
+     merge1 <- merge(zillow3, select(hmda2, c(id_number, LoanAmount, respondent_id_prop)), 
                 by.x = c("id_number", "LoanAmount"),
                 by.y = c("id_number", "LoanAmount"))
 
-      merge1 %<>% mutate(loan_amount = loan_amount.x) %>% select(-c('loan_amount.x', 'loan_amount.y')) %>% st_as_sf()
+      merge1 %<>%  st_as_sf()
       coord = st_coordinates(merge1)
       merge1 %<>% as.data.table() %>% select(-geometry)
       merge1 = cbind(merge1, coord)
@@ -589,41 +606,41 @@ for(i in 1:length(state.id)){
       zillow3$loan_amount = as.numeric(zillow3$loan_amount)
       hmda2$loan_amount = hmda2$loan_amount %>% as.numeric()
       
-      merge12 = merge(zillow3, hmda2, 
+      merge12 = merge(zillow3, select(hmda2, c(id_number, loan_amount, respondent_id_prop)), 
                       by.x = c("id_number", "loan_amount"),
                       by.y = c("id_number", "loan_amount"))
       
-      merge12 %<>% mutate(LoanAmount = LoanAmount.x) %>% select(-c('LoanAmount.x', 'LoanAmount.y')) %>% st_as_sf()
+      merge12 %<>% st_as_sf()
       coord = st_coordinates(merge12)
       merge12 %<>% as.data.table() %>% select(-geometry)
       merge12 = cbind(merge12, coord)
       merge1 = rbind(merge1, merge12) %>% unique()
       
-      # SECOND: merge by respondent_id, LoanAmount, and LenderName
+      # SECOND: merge by respondent_id_prop, LoanAmount, and LenderName
       rm(hmda2)
       merge1_store = merge1
 
   }
 
       merge1 = merge1_store %>% as.data.table()
-      hmda = hmda %>% as.data.table() %>% setkey(respondent_id)
+      hmda = hmda %>% as.data.table() %>% setkey(respondent_id_prop)
       lendername = lendername_dictionary %>% filter(activity_year == year.id[[j]])
-      hmda[setkey(lendername[,.(LenderName, respondent_id)],respondent_id), on = 'respondent_id', LenderName := i.LenderName]
+      hmda[setkey(lendername[,.(LenderName, respondent_id_prop)],respondent_id_prop), on = 'respondent_id_prop', LenderName := i.LenderName]
       hmda_sameyr = hmda %>% filter(!is.na(LenderName))
 
       `%nin%` = Negate(`%in%`)
 
-      if(year.id[[j]] + 1 <= max(year.id) + 1){
-        lendername = lendername_dictionary %>% filter(activity_year == year.id[[j]] + 1 & respondent_id %nin% hmda_sameyr$respondent_id) 
+      if(year.id[[j]] + 1 <= max(year.id) + 1 & year.id[[j]] != 2018){
+        lendername = lendername_dictionary %>% filter(activity_year == year.id[[j]] + 1 & respondent_id_prop %nin% hmda_sameyr$respondent_id_prop) 
         hmda_nextyr = hmda %>% filter(is.na(LenderName))
-        hmda_nextyr[setkey(lendername[,.(LenderName, respondent_id)],respondent_id), on = 'respondent_id', LenderName := i.LenderName]
+        hmda_nextyr[setkey(lendername[,.(LenderName, respondent_id_prop)],respondent_id_prop), on = 'respondent_id_prop', LenderName := i.LenderName]
       } else{hmda_nextyr = NULL}
 
       if(year.id[[j]] - 1 >= min(year.id) - 1){
-        lendername = lendername_dictionary %>% filter(activity_year == year.id[[j]] - 1 & respondent_id %nin% hmda_sameyr$respondent_id)
-        if(exists('hmda_nextyr')){lendername %<>% filter(activity_year == year.id[[j]] - 1 & respondent_id %nin% hmda_nextyr$respondent_id)} 
+        lendername = lendername_dictionary %>% filter(activity_year == year.id[[j]] - 1 & respondent_id_prop %nin% hmda_sameyr$respondent_id_prop)
+        if(exists('hmda_nextyr')){lendername %<>% filter(activity_year == year.id[[j]] - 1 & respondent_id_prop %nin% hmda_nextyr$respondent_id_prop)} 
         hmda_prevyr = hmda %>% filter(is.na(LenderName))
-        hmda_prevyr[setkey(lendername[,.(LenderName, respondent_id)],respondent_id), on = 'respondent_id', LenderName := i.LenderName]
+        hmda_prevyr[setkey(lendername[,.(LenderName, respondent_id_prop)],respondent_id_prop), on = 'respondent_id_prop', LenderName := i.LenderName]
       } else{hmda_prevyr = NULL}
       # The merge by id_number, LoanAmount, and LenderName
 
@@ -634,10 +651,10 @@ for(i in 1:length(state.id)){
       hmda3 <- hmda_temp[which(hmda_temp$id_number != 'NA' & !is.na(hmda_temp$id_number) & 
                               hmda_temp$LoanAmount != 'NA' & !is.na(hmda_temp$LoanAmount) &
                               hmda_temp$LenderName != "NA" & !is.na(hmda_temp$LenderName) & state_code == '06' & county_code != 'NA' & census_tract != 'NA' & !is.na(census_tract)), ]
-      
+      hmda3$loan_amount %<>% as.numeric()
       zillow4<- setDT(zillow_tract)[, .(n = .N), by = c('id_number', 'loan_amount', 'LenderName')] %>% filter(n == 1)
-      
-      merge2 <- merge(zillow4, hmda3,
+      zillow4$loan_amount %<>% as.numeric()
+      merge2 <- merge(zillow4, select(hmda3, c(id_number, loan_amount, LenderName)),
                       by.x = c("id_number", "loan_amount", "LenderName"),
                       by.y = c("id_number", "loan_amount", "LenderName"))
       
@@ -681,8 +698,9 @@ for(i in 1:length(state.id)){
                        by.y = c("id_number", "loan_amount", "LenderName2"))
       
       zillow5 <- zillow5[which(zillow5$n == 1), ] %>% mutate(loan_amount = as.numeric(loan_amount))
-      
-      merge3 <- merge(zillow5, hmda4,
+      zillow5$loan_amount %<>% as.numeric()
+      hmda4$loan_amount %<>% as.numeric()
+      merge3 <- merge(zillow5, select(hmda4, c(id_number, loan_amount, LenderName2)) ,
                       by.x = c("id_number", "loan_amount", "LenderName2"),
                       by.y = c("id_number", "loan_amount", "LenderName2"))
       
@@ -706,7 +724,6 @@ for(i in 1:length(state.id)){
       merge3$loan_amount %<>% as.numeric()
       
       #have_I_broken <- readline(prompt="Have I broken? ")
-
       final.merge <- smartbind(merge1, merge2, merge3)
       
       
