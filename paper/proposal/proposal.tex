@@ -1,0 +1,116 @@
+\documentclass[10pt]{article}
+
+\usepackage{enumitem}
+\usepackage{expdlist}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bbm}
+\usepackage[english]{babel}
+\usepackage{lipsum}
+\usepackage{multirow}
+\usepackage{fancyhdr,lastpage}
+\usepackage{float}
+\usepackage{changepage}
+\usepackage{hyperref}
+\usepackage{setspace}
+\usepackage[round]{natbib}
+
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{fouriernc}
+\usepackage{tgbonum}
+
+
+\usepackage[letterpaper, top=1in, margin=1in]{geometry}
+
+
+\makeatletter
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%Environments for notes
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%Custom commands relevant to statistics
+\newcommand{\Exp}{\textnormal{E}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\title{{\bf  Sorting Over Wildfire Risk and Amenities at the Wildland-Urban Interface}}
+\author{Matthew Wibbenmeyer\thanks{Resources for the Future, 1616 P St NW Suite 600, Washington, D.C.\ 20036, \href{mailto:wibbenmeyer@rff.org}{wibbenmeyer@rff.org}}}
+
+\setstretch{1.4}
+
+\maketitle
+
+\section{Introduction}
+
+\section{Model}
+
+Our model follows previous ``horizontal'' residential sorting models such as \citet{bayer2007,klaiberphaneuf,bakkensenma}. Like these previous studies, we estimate a discrete choice model in which households with heterogeneous preferences choose among housing options that are differentiated by location, and structural and neighborhood characteristics. Here we also allow housing options to be differentiated by wildfire hazard. 
+
+We define the indirect utility household $i$ receives from choosing residence $j$ at time $t$ as:
+\begin{align}
+V^i_{jt} = {\bf X}'_{jt}{\boldsymbol \alpha}^i  - \alpha_p P_{jt} + \xi_{jt} + \varepsilon^i_{jt},
+\end{align}
+where $X_{jt}$ is a $K\times 1$ vector of characteristics of housing choice $j$, including $K_s$ structural characteristics, $K_l$ neighborhood indicators, and $K_r$ wildfire hazard bins (i.e. $K = K_s + K_l + K_r$). $P_{jt}$ represents the price of home $j$ at time $t$, and $\xi_{jt}$ and $\varepsilon^i_{jt}$ are unobserved by the econometrician. We model preferences $\alpha^i$ over $X_{jt}$ as:
+\begin{align} \label{eq:alpha_i}
+{\boldsymbol \alpha}^i = {\boldsymbol \alpha}_{0} + {\bf A}{\bf Z}_i 
+\end{align}
+where ${\bf Z}$ is an $M\times 1 $ vector of characteristics of household $i$ and $A$ is a $K\times M$ matrix describing how household characteristics modify preferences over housing choices. Using equation~\ref{eq:alpha_i}, we can rewrite the indirect utility function, dividing it into choice and individual-specific components:
+\begin{align} \label{eq:v_rewrite}
+V^i_{jt} =  \delta_{jt} + {\bf X}'_{jt}{\bf A}{\bf Z}_i + \varepsilon^i_{jt}
+\end{align}
+where: 
+\begin{align} \label{eq:delta}
+\delta_{jt} = {\bf X}'_{jt}{\boldsymbol \alpha}_{0}  - \alpha_p P_jt + \xi_{jt}.
+\end{align}
+The estimation proceeds in two steps. First, we estimate the probability household $i$ chooses property $j$ from other properties in its choice set at time $t$. Household $i$ chooses property $j$ if $V^i_{jt} > V^i_{j't}$ for all $j' \neq j$. Assuming $\varepsilon^i_{jt}$ are indepently Type I extreme value distributed, the probability household $i$ selects property $j$ can be written:
+\begin{align} \label{eq:prob_vi}
+Pr(V^i_{jt} > V^i_{j't} \forall j' \neq j) = \frac{\exp(V^i_{jt})}{\sum_{j' \neq j} \exp(V^i_{j't})}.
+\end{align}
+Using this expression for the probability of selecting location $i$, we can estimate the parameters of equation~\ref{eq:v_rewrite} by maximum likelihood. Estimated parameters include a potentially large number of alternative-specific constants $\delta_{jt}$.
+%Suppose $K_s$ consists of $S$ vectors of mutually exclusive binary variables $k_s$, such that $K = [k_1, \dots, k_S]$, while $K_l$ and $K_r$ consist of $L$ and $R$ mutually-exclusive binary neighborhood and wildfire risk variables, respectively. Then estimation of equation~\ref{eq:prob_vi} requires estimation of $J = L\times R\times\prod_{s=1}^S \dim(k_s)$ alternative-specific constants. 
+We estimate alternative-specific constants using a contraction-mapping algorithm described by \citep{blp1995}. 
+%Need to define choice set. Bakkensen and Ma seem to differ from other authors on how to define the choice set.
+
+After recovering alternative-specific constants, the second stage of the estimation uses the recovered estimates $\hat{\delta}_{jt}$ to estimate equation~\ref{eq:delta}. Formally, we estimate:
+\begin{align*}
+\hat{\delta}_{jt} = {\bf X}'_{jt}{\boldsymbol \alpha}_{0}  - \alpha_p P_jt + \xi_{jt}.
+\end{align*}
+Let ${\boldsymbol \alpha}_r$ represent the vector of coefficients on the $K_r \times 1$ vector of wildfire hazard variables we denote ${\bf X}^r_{jt}$. The coefficients  $\alpha_p$  and $\alpha_r$ are the primary coefficients of interest to this study. However, they are confounded by two sources of endogeity. First, $P_{jt}$ may be correlated with $\xi_{jt}$ due to unobserved neighborhood or structural characteristics that affect perceived property quality. To account for price endogeneity, we adopt the instrumental variables approach suggested by \citet{bayertimmins}. %Say more.
+
+In estimating equation~\ref{eq:delta}, we are concerned with two sources of endogeneity. First, $P_{jt}$ may be correlated with $\xi_{jt}$ due to unobserved neighborhood or structural characteristics that affect perceived property quality. To account for price endogeneity, we adopt the instrumental variables approach suggested by \citet{bayertimmins}. While characteristics of distant communities are exogenous to unobserved attributes of property $j$, properties in those communities may be be substitutes and thus affect the price of property $j$. We will need to carefully consider which attributes of distant communities to use in our instrument, and which communities to use to define the instrument for each observations. One possibility is to follow \citet{bakkensenma} in using the share of undeveloped developable land in nearby communities as an instrument.
+
+Second, unobserved amenities are likely correlated with wildfire hazard. For example, amenities associated with living in scenic rural areas may be correlated with wildfire risk but difficult to fully capture through observable control variables. Some previous studies of household sorting concerned with similar endogeneity concerns have used boundary discontinuity designs, as described by \citet{black1999}. For example, \citet{bakkensenma} compare properties close to one another but on opposite sides of a flood zone boundary, under the assumption that flood risk will vary discontinously, while other unobserved property characteristics will vary discontinuously, at the boundary. In contrast to some of these previous studies; wildfire hazard typically does not vary discontinuously over space. Therefore, we adopt an alternative quasi-experimental strategy based on a difference-in-differences approach.
+
+\citet{mccoywalsh} find that home prices in high fire hazard areas respond negatively to nearby fires, even for homes that are undamaged and even for homes from which those fires' ``scars'' are not visible. This finding has parallels in the flood literature in which many studies have found that following floods, home prices in nearby high risk areas fall, even for homes with no flood damage. Based on the results of these previous studies, we adopt a difference-in-differences strategy using changes in the salience of wildfire risk after notable highly damaging wildfire incidents. 
+
+Let ${\bf X}^r_{jt} = [{\bf W}^r_{j}, \mathbbm{1}\{t \in [T_j,T_j + c)\} \times {\bf W}^r_j]$, where $W^r_j$ is a vector of wildfire hazard bins and $T_j$ is the year of a notable fire in location $j$, and $c > 0$ represents the number of years after year $T_j$ we expect to observe effects on household sorting behavior. Previous studies indicate that $c$ should 2-3 years. Let ${\boldsymbol \alpha}^r$ and ${\boldsymbol\alpha}^{r \times t}$ represent the coefficients on the components of ${\bf X}^r_{jt}$, respectively, where ${\boldsymbol \alpha}^r = [{\boldsymbol \alpha}^r, {\boldsymbol\alpha}^{r \times t}]$. The vector ${\boldsymbol\alpha}^{r \times t}$ is a difference-in-differences coefficient that measures the effect of wildfire hazard on indirect utility. 
+
+Indirect utility of properties in high wildfire hazard areas may change in response to salient wildfires for several reasons. First, home buyers may be wary of potential losses. Second, availability and cost of wildfire insurance may change in response to wildfire. In the longer run, other costs of living in high risk wildfire areas may increase as well. For example, regulations may increase costs of living in high risk areas, for example by requiring that homeowners maintain ``defensible space'' clear of vegetation around their home. Each of these is a potential factor underlying the parameter ${\boldsymbol\alpha}^{r \times t}$. Identification of ${\boldsymbol\alpha}^{r \times t}$---as distinct from amenities correlated with wildfire hazard---requires the assumption that there are no unobserved factors that vary over time in ways that are correlated with wildfire hazard. We believe this is a reasonable assumption because we expect amenities to be fairly constant over time. 
+
+\section{Data}
+
+\subsection{Housing Transactions and Buyer Characteristics}
+
+Housing transactions data come from the Zillow Transaction and Assessment Dataset (ZTRAX). ZTRAX housing transactions data include price and year of sale, as well as coordinates for more than 20 years of housing transactions in the US, though the most complete records begin in 2003. Merging transactions data with county assessors' data, also from ZTRAX, provides a variety of property and building characteristics, including lot size, square feet, number of rooms, year of construction, roof type and siding type. These latter three building characteristics are known to be important factors underlying probablility of structure loss during wildfires.
+
+ZTRAX contain no information regarding buyer characteristics. To identify demographic characteristics of buyers, we follow a procedure established by \citet{bayer2007} for merging property transactions data the Consumer Financial Protection Bureau (CFPB) Home Mortgage Disclosure Act data set. The HMDA requires financial institutions to disclose loan-level data regarding mortgages, including Census tract, loan amount, and applicant income, race, and sex. For properties were bought with a mortgage, ZTRAX transactions data also include the name of the lender. Therefore, following the procedure layed out by \citet{bayer2007}, we link ZTRAX property transactions data to HMDA data by merging on Census tract, lender name, and loan amount. \citet{bayer2007} are able find unique matches for approximately 60 percent of the property transactions in their sample; therefore, though we do not expect that we will be able to identify buyer characteristics for all transactions, we expect this procedure will yield a large sample of transactions for which we observe buyer characteristics.
+
+\subsection{Wildfire Hazard}
+
+
+
+\bibliographystyle{jpam}
+\bibliography{bibliography}
+
+
+\end{document}
