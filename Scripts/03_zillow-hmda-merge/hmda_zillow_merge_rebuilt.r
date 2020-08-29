@@ -11,6 +11,8 @@
 devtools::install_github('walkerke/tigris')
 library(pacman)
 
+
+
 p_load(gmodels,
   gtools,
   RPostgres,
@@ -39,10 +41,12 @@ p_load(gmodels,
   jsonlite,
   httr,
   ggplot2,
-  data.table,
   here,
-  stringi)
+  stringi,
+  stringr,
+  data.table)
 
+p_update()
 #---------------------------------------------------------------------------------------------------
 # LOOP SETUP
 #---------------------------------------------------------------------------------------------------
@@ -59,10 +63,10 @@ p_load(gmodels,
   database <- dbConnect(RSQLite::SQLite(), zillowdbloc)
   
 #FULL HMDA DATA
-  pwd = rstudioapi::askForPassword("Enter your password for your HMDA database:")
-  user = rstudioapi::askForPassword("Enter your username for your database. If you didn't set one, use 'postgres'")
+  pwd = readline(prompt = "Enter your password for your HMDA database: ")
+  user = readline(prompt = "Enter your username for your database. If you didn't set one, use 'postgres' ")
   hmda_database = dbConnect(Postgres(), host = 'localhost', dbname = 'hmda', 
-    password = pwd, user = user)
+    password = 'sortingproject', user = 'postgres')
   hmdadatabase = hmda_database
 
   #HMDA 2002-2019
@@ -132,13 +136,18 @@ p_load(gmodels,
   #---------------------------------------------------------------------------------------------------
   #options(tigris_class = "sf" 
   #options(tigris_use_cache = FALSE)
-    
-tracts2000 <- tracts('CA', county = NULL, cb = TRUE, year = 2000, refresh = TRUE)
 
-#1990 tracts used through 2003 in HMDA reporting  
+#2000 tracts used for years 2004-2009
+tracts2000 <- tracts('CA', county = NULL, cb = FALSE, year = 2000, refresh = TRUE)
+
+#1990 tracts used through 2003 in HMDA reporting, but uses only less-well-defined tigris definitions, unfortunately  
 tracts1990 <- tracts('CA', county = NULL, cb = TRUE, year = 1990, refresh = TRUE)
-    
-tracts2010 <- tracts('CA', county = NULL, cb = TRUE, year = 2010, refresh = TRUE)
+
+#2010 tracts used for HMDA data between 2010 and 2016
+tracts2010 <- tracts('CA', county = NULL, cb = FALSE, year = 2010, refresh = TRUE)
+
+#2015 tracts are used for 2017 and onwards
+tracts2015 <- tracts('CA', county = NULL, cb = FALSE, year = 2015, refresh = TRUE)
     
     
 #racts1990$TRACTCE90 <- paste(tracts1990$TRACTBASE,tracts1990$TRACTSUF , sep="")
@@ -146,6 +155,8 @@ tracts2010 <- tracts('CA', county = NULL, cb = TRUE, year = 2010, refresh = TRUE
 #storage object for full list of unique respondent id's mapped to lender names for second most important join. This is time consuming to build, but allows for a more intelligent mapping process where lenders identfied out-of-year 
 #get results.
 
+
+buildfromdisk = TRUE
 lendername_dictionary = NULL
 pinfo = tbl(database, 'propInfo')
 #pinfo = tbl(database, 'propTrans')
@@ -153,6 +164,18 @@ zillowSQL1_con = tbl(database, 'Main')
 #zillowSQL1_con = tbl(database, 'mainAsmt')
 maintranstab = tbl(database, 'largetransaction')
 #maintranstab = tbl(database, 'mainTrans')
+
+if(buildfromdisk){
+  lendername_dictionary = readRDS(here('lendername_dict.dta'))
+} else{print('reading in zillow db for speed')
+      zilint = left_join(maintranstab, pinfo, by = 'TransId')
+      zilint = zilint %>% filter(DataClassStndCode %in% c('D', 'H'))
+      zilint1 = left_join(zilint, tbl(database, 'MainAssmt'), by = 'ImportParcelID')
+      zilint1 = left_join(zilint1, tbl(database, 'bldg'), by = 'RowID')
+      zillowSQLint = zilint1 %>% dplyr::select(SalesPriceAmount, PropertyAddressLatitude, LoanAmount, PropertyAddressLongitude, ImportParcelID, TransId, LenderDBAName, LenderIDStndCode, LenderName, InitialInterestRate, FIPS, RecordingDate, DocumentDate) %>% 
+                                              mutate(date = as.Date(RecordingDate)) %>% collect() %>% as.data.table()}
+
+
 
 for(i in 1:length(state.id)){
     for (j in 1:length(year.id)){
@@ -164,40 +187,30 @@ for(i in 1:length(state.id)){
 
         if(is.null(lendername_dictionary)){
           for (k in 1:length(year.id)) {
+      lendername_dictionary = readRDS(lendername_dictionary, file = here('lendername_dict_no2019.dta'))
       print(paste0('starting dictionary build for ',year.id[[k]]))
       yrnum = year.id[k]
       #comb = left_join(zillowSQL1_con, maintranstab, by = 'TransId')
-      zillowSQL1 = maintranstab %>% dplyr::select(TransId, FIPS, RecordingDate, LenderName, SalesPriceAmount, LoanAmount, InitialInterestRate) %>% 
-                                              mutate(date = as.Date(RecordingDate))%>% dplyr::filter(date == yrnum) %>% collect()
-       
-      
-
-    
 
       #If Statement that loanamount is not all zeros
       zilint = left_join(maintranstab, pinfo, by = 'TransId')
       zilint = zilint %>% filter(DataClassStndCode %in% c('D', 'H'))
       zilint1 = left_join(zilint, tbl(database, 'MainAssmt'), by = 'ImportParcelID')
       zilint1 = left_join(zilint1, tbl(database, 'bldg'), by = 'RowID')
-      zilint1 = zilint1 %>% filter(PropertyLandUseStndCode %in% c('RR101',  # SFR
-                                            'RR999',  # Inferred SFR
-                                           'RR102')  # Rural Residence   (includes farm/productive land?)
-             )
       
-      zillowSQL3 = zilint1 %>% dplyr::select(PropertyAddressLatitude, PropertyAddressLongitude, ImportParcelID, TransId, LenderDBAName, LenderIDStndCode) %>% collect() %>% as.data.table()
+      zillowSQL = zillowSQLint %>% filter(date == yrnum)
       rm(zilint, zilint1)
       rm(test1)
       # Census tract data
 
-      zillowSQL <- merge(zillowSQL1, zillowSQL3, by.x = c("TransId"),
-                         by.y = c("TransId") , allow.cartesian = FALSE, all.x = TRUE)
+     
       
       
       zillow.main <- zillowSQL[which(zillowSQL$PropertyAddressLatitude != "NA" & !is.na(zillowSQL$PropertyAddressLatitude) &
                                        ((zillowSQL$SalesPriceAmount!= "NA" & !is.na(zillowSQL$SalesPriceAmount) &
                                            zillowSQL$SalesPriceAmount>= 1000) & 
                                           (zillowSQL$LoanAmount > 0 
-                                           & zillowSQL$LoanAmount != "NA" & !is.na(zillowSQL$LoanAmount)))) , ] %>% as.data.table()
+                                           & zillowSQL$LoanAmount != "NA" & !is.na(zillowSQL$LoanAmount)))) , ]
       
       setkey(zillow.main, NULL)
       zillow.main = unique(zillow.main)      
@@ -247,29 +260,37 @@ for(i in 1:length(state.id)){
       #tracts2000 is baseline
       
       tracts2010 <- st_transform(tracts2010, census.CRS)
+
+      tracts2015 = st_transform(tracts2015, census.CRS)
       
       tracts1990$TRACTSUF[is.na(tracts1990$TRACTSUF)] <- "00"
       #for 1990 tracts. NA sub for 00
+
       if(year.id[k] > 2017){
-        zillow_tract <- st_join(cord.UTM, tracts2010, join = st_within)
-        zillow_tract$id_number = paste0(zillow_tract$STATE,zillow_tract$COUNTY, zillow_tract$TRACT)
+        zillow_tract <- st_join(cord.UTM, tracts2015, join = st_within)
+        zillow_tract$id_number = zillow_tract$GEOID
       }
-      if(year.id[k] %in% c(2012:2017)){
-        zillow_tract <- st_join(cord.UTM, tracts2010, join = st_within)
-        zillow_tract$id_number <- paste(zillow_tract$COUNTY, zillow_tract$TRACT, sep = '')
+      if(year.id[k] == 2017){
+        zillow_tract <- st_join(cord.UTM, tracts2015, join = st_within)
+        zillow_tract$id_number <- paste(zillow_tract$COUNTYFP, zillow_tract$TRACTCE, sep = '')
         # Add decimal to make mergeable to HMDA data
         zillow_tract$id_number <- sub("([[:digit:]]{2,2})$", ".\\1", zillow_tract$id_number)
       }
-      if(year.id[k] %in% c(2004:2012)){
+      if(year.id[k] %in% c(2012:2016)){
+        zillow_tract <- st_join(cord.UTM, tracts2010, join = st_within)
+        zillow_tract$id_number <- paste(zillow_tract$COUNTYFP, zillow_tract$TRACTCE, sep = '')
+        # Add decimal to make mergeable to HMDA data
+        zillow_tract$id_number <- sub("([[:digit:]]{2,2})$", ".\\1", zillow_tract$id_number)
+      }
+      if(year.id[k] %in% c(2003:2011)){
           zillow_tract <- st_join(cord.UTM, tracts2000, join = st_within)
-          zillow_tract$id_number <- paste(zillow_tract$COUNTY, zillow_tract$TRACT, sep = '')
+          zillow_tract$id_number <- paste(zillow_tract$COUNTYFP, zillow_tract$TRACTCE, sep = '')
           # Add decimal to make mergeable to HMDA data
           zillow_tract$id_number <- sub("([[:digit:]]{2,2})$", ".\\1", zillow_tract$id_number)
       }
-
-      if(year.id[k] <= 2003){
+      if(year.id[k] <= 2002){
         zillow_tract <- st_join(cord.UTM, tracts1990, join = st_within)
-        zillow_tract$id_number <- paste(zillow_tract$COUNTYFP, zillow_tract$TRACTBASE, '.', zillow_tract$TRACTSUF, sep = '')
+        zillow_tract$id_number <- paste(zillow_tract$CO, zillow_tract$TRACTBASE, '.', zillow_tract$TRACTSUF, sep = '')
       }
       
       
@@ -289,19 +310,25 @@ for(i in 1:length(state.id)){
       # Filter to unique transactions
       #count.zillow = 
       #setkey(zillow_temp)
-      zillow3_filt = setDT(zillow_tract)[, .(n = .N), by = .(id_number,LoanAmount)]
-      zillow3 = merge(zillow_tract,zillow3_filt, by =c('id_number','LoanAmount')) %>% filter(n == 1)
+      zillow3_filt = setDT(zillow_tract)[, .(n = .N), by = .(id_number,loan_amount)]
+      zillow3 = merge(zillow_tract,zillow3_filt, by =c('id_number','loan_amount')) %>% filter(n == 1)
       
       zillow3_dt = zillow3 %>% as.data.table()
       # HMDA
 
       ## generate name of table from target year
-
       table_name = paste('lar', year.id[[k]], sep = '_')
-      hmda = tbl(hmda_database, in_schema('hmda_public',table_name)) %>% collect()
-      
+      hmda = tbl(hmda_database, in_schema('hmda_public', table_name)) %>% dplyr::filter(state_code == '06' | state_code =='CA') %>% collect()
+      hmda = hmda %>% tail(-1)
+      hmda = as.data.table(hmda)
+      if(year.id[[k]] > 2016){
+        hmda$sequence_num = seq.int(nrow(hmda)) %>% as.character()
+      }
+      hmda$sequence_num = hmda$sequence_num %>% as.character() %>% parse_number()
+
       if(year.id[[k]] %in% c(year.id[[1]]:2017)){
-        hmda$respondent_id_prop = stri_join(hmda$agency_code, hmda$respondent_id, sep = '')
+        hmda %<>% mutate(agency_code = ifelse(is.na(agency_code), '023', agency_code))
+        hmda %<>% mutate(respondent_id_prop = str_c(agency_code, respondent_id, sep = ''))
       }
       
       if(year.id[[k]] > 2017){
@@ -309,7 +336,13 @@ for(i in 1:length(state.id)){
       }
 
       # Keep only home purchases and create LoanAmount column to match Zillow's
-      hmda$LoanAmount <- hmda$loan_amount %>% as.numeric() * 1000
+      
+      if(year.id[[k]] > 2017){
+        hmda$loan_amount %<>% as.numeric()
+        hmda %<>% as.data.table()
+        hmda[,LoanAmount := loan_amount]
+        hmda[,loan_amount := round(loan_amount/1000)]
+      } else{hmda %<>% mutate(loan_amount = as.numeric(loan_amount)) %>% mutate(LoanAmount = loan_amount*1000)}
       
       # Create location identifiers to match Zillow data
       hmda$county_code <- parse_number(hmda$county_code)
@@ -319,7 +352,7 @@ for(i in 1:length(state.id)){
       hmda$county_code <- as.character(hmda$county_code)
       
       if(year.id[[k]] < 2018){
-        hmda$id_number <- paste(hmda$county_code, hmda$census_tract, sep = '')
+        hmda$id_number <- paste(hmda$state_code,hmda$county_code, hmda$census_tract, sep = '')
       } else{
         hmda$id_number = hmda$census_tract
       }
@@ -352,12 +385,7 @@ for(i in 1:length(state.id)){
       hmda2$LoanAmount %<>% as.numeric()
       zillow3$LoanAmount %<>% as.numeric()
       
-      if(year.id[[k]] > 2017){
-        hmda2$loan_amount %<>% as.numeric()
-      hmda2[,LoanAmount := loan_amount]
-      hmda2[,loan_amount := round(loan_amount/1000)]
       
-      }
       merge1 <- merge(zillow3, hmda2, 
                       by.x = c("id_number", "LoanAmount"),
                       by.y = c("id_number", "LoanAmount"), .keep_all = TRUE)
@@ -372,27 +400,33 @@ for(i in 1:length(state.id)){
       hmda2$loan_amount = hmda2$loan_amount %>% as.numeric()
       merge12 = merge(zillow3, hmda2, 
                       by.x = c("id_number", "loan_amount"),
-                      by.y = c("id_number", "loan_amount"))
+                      by.y = c("id_number", "loan_amount"), .keep_all = TRUE)
       #merge1$geometry
       merge12 %<>%  st_as_sf()
       coord = st_coordinates(merge12)
       merge12 %<>% as.data.table() %>% select(-geometry)
       merge12 = cbind(merge12, coord)
 
-      p_load(sf)
-      merge1 = rbind(merge1,merge12) %>% unique()
+      merge1 = rbind(merge1,merge12, fill = TRUE) %>% unique()
       
       # SECOND: merge by respondent_id_prop, LoanAmount, and LenderName
       rm(hmda2)
       # Create database of LenderName using respondent_id_prop
       lendername <- subset(merge1, select = c(LenderName, respondent_id_prop, activity_year)) %>% as.data.table() %>% dplyr::select(LenderName, respondent_id_prop, activity_year)
       lendername_dictionary = rbind(lendername, lendername_dictionary)
-      lendername_dictionary = unique(lendername_dictionary)
+      lendername_dictionary = unique(as.data.frame(lendername_dictionary))
       if(!exists('merge1_store')){
         merge1_store = merge1
-      } 
+      }
+      if(year.id[[k]] == 2018){
+        saveRDS(lendername_dictionary, file = here('lendername_dict_no2019.dta'))
+      }
+      if(year.id[[k]] == 2019){
+        saveRDS(lendername_dictionary, file = here('lendername_dict.dta'))
+      }
     }
   } else{
+     if(buildfromdisk == FALSE){saveRDS(lendername_dictionary, file = here('lendername_dict.dta'))}
       # Pull in data needed to run code
       yrnum = year.id[[j]]
       # Zillow Transaction data (two parts, plus a merge)
@@ -408,32 +442,22 @@ for(i in 1:length(state.id)){
 
       #If Statement that loanamount is not all zeros
       pinfo = tbl(database, 'propInfo')
+      
+      
+      #zillowSQL3 = zilint1 %>% dplyr::select(PropertyAddressLatitude, PropertyAddressLongitude, ImportParcelID, TransId, LenderDBAName, LenderIDStndCode) %>% collect() %>% as.data.table()
+      rm(zilint, zilint1)
+      #rm(test1)
+      # Census tract data
       zilint = left_join(maintranstab, pinfo, by = 'TransId')
       zilint = zilint %>% filter(DataClassStndCode %in% c('D', 'H'))
       zilint1 = left_join(zilint, tbl(database, 'MainAssmt'), by = 'ImportParcelID')
       zilint1 = left_join(zilint1, tbl(database, 'bldg'), by = 'RowID')
-      zilint1 = zilint1 %>% filter(PropertyLandUseStndCode %in% c('RR101',  # SFR
+      zillowSQL = zilint1 %>%  filter(PropertyLandUseStndCode %in% c('RR101',  # SFR
                                             'RR999',  # Inferred SFR
-                                           'RR102',  # Rural Residence   (includes farm/productive land?)
-                                            'RR104',  # Townhouse
-                                            'RR105',  # Cluster Home
-                                            'RR106',  # Condominium
-                                            'RR107',  # Cooperative
-                                            'RR108',  # Row House
-                                            'RR109',  # Planned Unit Development
-                                            'RR113',  # Bungalow
-                                            'RR116',  # Patio Home
-                                            'RR119',  # Garden Home
-                                            'RR120'), # Landominium
-             )
+                                           'RR102')) %>%
+                                            dplyr::select(PropertyLandUseStndCode,SalesPriceAmount, PropertyAddressLatitude, LoanAmount, PropertyAddressLongitude, ImportParcelID, TransId, RowID, LenderDBAName, LenderIDStndCode, LenderName, InitialInterestRate, FIPS, RecordingDate, DocumentDate) %>% 
+                                              mutate(date = as.Date(RecordingDate)) %>% dplyr::filter(date == yrnum) %>% collect() %>% as.data.table()
       
-      zillowSQL3 = zilint1 %>% dplyr::select(PropertyAddressLatitude, PropertyAddressLongitude, ImportParcelID, TransId, LenderDBAName, LenderIDStndCode) %>% collect() %>% as.data.table()
-      rm(zilint, zilint1)
-      rm(test1)
-      # Census tract data
-
-      zillowSQL <- merge(zillowSQL1, zillowSQL3, by.x = c("TransId"),
-                         by.y = c("TransId") , allow.cartesian = FALSE, all.x = TRUE)
       
       
       zillow.main <- zillowSQL[which(zillowSQL$PropertyAddressLatitude != "NA" & !is.na(zillowSQL$PropertyAddressLatitude) &
@@ -490,27 +514,35 @@ for(i in 1:length(state.id)){
       #tracts2000 is baseline
       
       tracts2010 <- st_transform(tracts2010, census.CRS)
+
+      tracts2015 <- st_transform(tracts2015, census.CRS)
       
      tracts1990$TRACTSUF[is.na(tracts1990$TRACTSUF)] <- "00"
       #for 1990 tracts. NA sub for 00
-      if(year.id[k] > 2017){
-        zillow_tract <- st_join(cord.UTM, tracts2010, join = st_within)
-        zillow_tract$id_number = paste0(zillow_tract$COUNTY, zillow_tract$TRACT)
+      if(year.id[j] > 2017){
+        zillow_tract <- st_join(cord.UTM, tracts2015, join = st_within)
+        zillow_tract$id_number = zillow_tract$GEOID
       }
-      if(year.id[j] %in% c(2012:2017)){
-        zillow_tract <- st_join(cord.UTM, tracts2010, join = st_within)
-        zillow_tract$id_number <- paste(zillow_tract$COUNTY, zillow_tract$TRACT, sep = '')
+      if(year.id[j] == 2017){
+        zillow_tract <- st_join(cord.UTM, tracts2015, join = st_within)
+        zillow_tract$id_number <- paste(zillow_tract$COUNTYFP, zillow_tract$TRACTCE, sep = '')
         # Add decimal to make mergeable to HMDA data
         zillow_tract$id_number <- sub("([[:digit:]]{2,2})$", ".\\1", zillow_tract$id_number)
       }
-      if(year.id[j] %in% c(2004:2012)){
+      if(year.id[j] %in% c(2012:2016)){
+        zillow_tract <- st_join(cord.UTM, tracts2010, join = st_within)
+        zillow_tract$id_number <- paste(zillow_tract$COUNTYFP, zillow_tract$TRACTCE, sep = '')
+        # Add decimal to make mergeable to HMDA data
+        zillow_tract$id_number <- sub("([[:digit:]]{2,2})$", ".\\1", zillow_tract$id_number)
+      }
+      if(year.id[j] %in% c(2003:2012)){
           zillow_tract <- st_join(cord.UTM, tracts2000, join = st_within)
-          zillow_tract$id_number <- paste(zillow_tract$COUNTY, zillow_tract$TRACT, sep = '')
+          zillow_tract$id_number <- paste(zillow_tract$COUNTYFP, zillow_tract$TRACTCE, sep = '')
           # Add decimal to make mergeable to HMDA data
           zillow_tract$id_number <- sub("([[:digit:]]{2,2})$", ".\\1", zillow_tract$id_number)
       }
 
-      if(year.id[j] <= 2003){
+      if(year.id[j] <= 2002){
         zillow_tract <- st_join(cord.UTM, tracts1990, join = st_within)
         zillow_tract$id_number <- paste(zillow_tract$COUNTYFP, zillow_tract$TRACTBASE, '.', zillow_tract$TRACTSUF, sep = '')
       }
@@ -542,19 +574,32 @@ for(i in 1:length(state.id)){
       ## generate name of table from target year
 
       table_name = paste('lar', year.id[[j]], sep = '_')
-      hmda = tbl(hmda_database, in_schema('hmda_public',table_name)) %>% collect() %>% as.data.table()
+      hmda = tbl(hmda_database, in_schema('hmda_public', table_name)) %>% dplyr::filter(state_code == '06' | state_code =='CA') %>% collect()
+      if(year.id[j] == 2019) {hmda = hmda %>% tail(-1)}
+      hmda = as.data.table(hmda)
+      if(year.id[[j]] > 2016){
+        hmda$sequence_num = seq.int(nrow(hmda)) %>% as.character()
+      }
+      hmda$sequence_num %<>% parse_number()
       
       if(year.id[[j]] %in% c(year.id[[1]]:2017)){
-        hmda$respondent_id_prop = stri_join(hmda$agency_code, hmda$respondent_id, sep = '')
+        hmda %<>% mutate(agency_code = ifelse(is.na(agency_code), '023', agency_code))
+        hmda %<>% mutate(respondent_id_prop= str_c(hmda$agency_code, hmda$respondent_id, sep = ''))
       }
       
       if(year.id[[j]] > 2017){
-        hmda$respondent_id_prop = hmda$lei
+        hmda %<>% mutate(respondent_id_prop = lei)
       }
 
       # Keep only home purchases and create LoanAmount column to match Zillow's
-      hmda$LoanAmount <- hmda$loan_amount %>% as.numeric() * 1000
-      
+      if(year.id[[j]] > 2017){
+        hmda %<>% as.data.table()
+        hmda$loan_amount %<>% as.numeric()
+        hmda = hmda[,LoanAmount := loan_amount]
+        hmda = hmda[,loan_amount := round(loan_amount/1000)]
+      } else{
+        hmda$LoanAmount <- hmda$loan_amount %>% as.numeric() * 1000
+      }
       # Create location identifiers to match Zillow data
       hmda$county_code <- parse_number(hmda$county_code)
       
@@ -594,7 +639,7 @@ for(i in 1:length(state.id)){
       zillow3$LoanAmount %<>% as.numeric()
       hmda2$LoanAmount %<>% as.numeric()
       
-     merge1 <- merge(zillow3, select(hmda2, c(id_number, LoanAmount, respondent_id_prop)), 
+     merge1 <- merge(zillow3, select(hmda2, c(id_number, LoanAmount, respondent_id_prop, sequence_num)), 
                 by.x = c("id_number", "LoanAmount"),
                 by.y = c("id_number", "LoanAmount"))
 
@@ -606,7 +651,7 @@ for(i in 1:length(state.id)){
       zillow3$loan_amount = as.numeric(zillow3$loan_amount)
       hmda2$loan_amount = hmda2$loan_amount %>% as.numeric()
       
-      merge12 = merge(zillow3, select(hmda2, c(id_number, loan_amount, respondent_id_prop)), 
+      merge12 = merge(zillow3, select(hmda2, c(id_number, loan_amount, respondent_id_prop, sequence_num)), 
                       by.x = c("id_number", "loan_amount"),
                       by.y = c("id_number", "loan_amount"))
       
@@ -614,7 +659,27 @@ for(i in 1:length(state.id)){
       coord = st_coordinates(merge12)
       merge12 %<>% as.data.table() %>% select(-geometry)
       merge12 = cbind(merge12, coord)
-      merge1 = rbind(merge1, merge12) %>% unique()
+      zillow3a = zillow3 %>% mutate(loan_amount = floor(LoanAmount/1000))
+      merge13 = merge(zillow3a, select(hmda2, c(id_number, loan_amount, respondent_id_prop, sequence_num)), 
+                      by.x = c("id_number", "loan_amount"),
+                      by.y = c("id_number", "loan_amount"))
+
+      merge13 %<>% st_as_sf()
+      coord = st_coordinates(merge13)
+      merge13 %<>% as.data.table() %>% select(-geometry)
+      merge13 = cbind(merge13, coord)
+      zillow3a = zillow3 %>% mutate(loan_amount = ceiling(LoanAmount/1000))
+      
+      merge14 = merge(zillow3a, select(hmda2, c(id_number, loan_amount, respondent_id_prop, sequence_num)), 
+                      by.x = c("id_number", "loan_amount"),
+                      by.y = c("id_number", "loan_amount"))
+
+      merge14 %<>% st_as_sf()
+      coord = st_coordinates(merge14)
+      merge14 %<>% as.data.table() %>% select(-geometry)
+      merge14 = cbind(merge14, coord)
+
+      merge1 = rbind(merge1, merge12, merge13, merge14) %>% unique(by = c('sequence_num'))
       
       # SECOND: merge by respondent_id_prop, LoanAmount, and LenderName
       rm(hmda2)
@@ -624,23 +689,51 @@ for(i in 1:length(state.id)){
 
       merge1 = merge1_store %>% as.data.table()
       hmda = hmda %>% as.data.table() %>% setkey(respondent_id_prop)
-      lendername = lendername_dictionary %>% filter(activity_year == year.id[[j]])
-      hmda[setkey(lendername[,.(LenderName, respondent_id_prop)],respondent_id_prop), on = 'respondent_id_prop', LenderName := i.LenderName]
+      lendername = lendername_dictionary %>% dplyr::filter(activity_year == year.id[[j]])
+      print('made it to hmda setkey')
+
+      #build hashmap
+      dictlist = as.list(lendername$LenderName)
+      names(dictlist) = lendername$respondent_id_prop
+      lendername.dict = list2env(dictlist, hash = TRUE)
+      
+      #dictionary querying helper-function
+      qry = function(item, dict) {
+        if(is.null(dict[[item]])) {return(NA)} else{return(dict[[item]])}}
+      
+      mappedvals = lapply(hmda$respondent_id_prop, FUN = qry, dict = lendername.dict)
+      hmda$LenderName = do.call(rbind, mappedvals)[,1]
+      #hmda[setkey(lendername[, .(LenderName, respondent_id_prop)],respondent_id_prop), on = 'respondent_id_prop', LenderName := i.LenderName]
       hmda_sameyr = hmda %>% filter(!is.na(LenderName))
 
       `%nin%` = Negate(`%in%`)
 
-      if(year.id[[j]] + 1 <= max(year.id) + 1 & year.id[[j]] != 2018){
+      if(year.id[[j]] + 1 <= max(year.id) + 1){
         lendername = lendername_dictionary %>% filter(activity_year == year.id[[j]] + 1 & respondent_id_prop %nin% hmda_sameyr$respondent_id_prop) 
         hmda_nextyr = hmda %>% filter(is.na(LenderName))
-        hmda_nextyr[setkey(lendername[,.(LenderName, respondent_id_prop)],respondent_id_prop), on = 'respondent_id_prop', LenderName := i.LenderName]
+        print('made it to hmda nxtyr setkey')
+
+        #make new hashmap
+        dictlist = as.list(lendername$LenderName)
+        names(dictlist) = lendername$respondent_id_prop
+        lendername.dict = list2env(dictlist, hash = TRUE)
+        mappedvals = lapply(hmda_nextyr$respondent_id_prop, FUN = qry, dict = lendername.dict)
+        hmda_nextyr$LenderName = do.call(rbind, mappedvals)[,1]
+        hmda_nextyr = hmda_nextyr %>% filter(!is.na(LenderName))
       } else{hmda_nextyr = NULL}
 
-      if(year.id[[j]] - 1 >= min(year.id) - 1){
+      if(year.id[[j]] - 1 >= min(year.id) - 1 & year.id[[j]] != 2018){
         lendername = lendername_dictionary %>% filter(activity_year == year.id[[j]] - 1 & respondent_id_prop %nin% hmda_sameyr$respondent_id_prop)
         if(exists('hmda_nextyr')){lendername %<>% filter(activity_year == year.id[[j]] - 1 & respondent_id_prop %nin% hmda_nextyr$respondent_id_prop)} 
         hmda_prevyr = hmda %>% filter(is.na(LenderName))
-        hmda_prevyr[setkey(lendername[,.(LenderName, respondent_id_prop)],respondent_id_prop), on = 'respondent_id_prop', LenderName := i.LenderName]
+
+        #make new hashmap
+        dictlist = as.list(lendername$LenderName)
+        names(dictlist) = lendername$respondent_id_prop
+        lendername.dict = list2env(dictlist, hash = TRUE)
+        mappedvals = lapply(hmda_prevyr$respondent_id_prop, FUN = qry, dict = lendername.dict)
+        hmda_prevyr$LenderName = do.call(rbind, mappedvals)[,1]
+        hmda_prevyr = hmda_prevyr %>% filter(!is.na(LenderName))
       } else{hmda_prevyr = NULL}
       # The merge by id_number, LoanAmount, and LenderName
 
@@ -650,11 +743,11 @@ for(i in 1:length(state.id)){
 
       hmda3 <- hmda_temp[which(hmda_temp$id_number != 'NA' & !is.na(hmda_temp$id_number) & 
                               hmda_temp$LoanAmount != 'NA' & !is.na(hmda_temp$LoanAmount) &
-                              hmda_temp$LenderName != "NA" & !is.na(hmda_temp$LenderName) & state_code == '06' & county_code != 'NA' & census_tract != 'NA' & !is.na(census_tract)), ]
+                              hmda_temp$LenderName != "NA" & !is.na(hmda_temp$LenderName) & (hmda_temp$state_code == '06'|hmda_temp$state_code == 'CA') & hmda_temp$county_code != 'NA' & hmda_temp$census_tract != 'NA' & !is.na(hmda_temp$census_tract)), ]
       hmda3$loan_amount %<>% as.numeric()
-      zillow4<- setDT(zillow_tract)[, .(n = .N), by = c('id_number', 'loan_amount', 'LenderName')] %>% filter(n == 1)
+      zillow4<- setDT(zillow_tract)[, .(n = .N), by = c('id_number', 'loan_amount', 'LenderName')] %>% filter(n == 1) %>% filter(!is.na(LenderName))
       zillow4$loan_amount %<>% as.numeric()
-      merge2 <- merge(zillow4, select(hmda3, c(id_number, loan_amount, LenderName)),
+      merge2 <- merge(zillow4, select(hmda3, c(id_number, loan_amount, LenderName, sequence_num, respondent_id_prop)),
                       by.x = c("id_number", "loan_amount", "LenderName"),
                       by.y = c("id_number", "loan_amount", "LenderName"))
       
@@ -700,7 +793,7 @@ for(i in 1:length(state.id)){
       zillow5 <- zillow5[which(zillow5$n == 1), ] %>% mutate(loan_amount = as.numeric(loan_amount))
       zillow5$loan_amount %<>% as.numeric()
       hmda4$loan_amount %<>% as.numeric()
-      merge3 <- merge(zillow5, select(hmda4, c(id_number, loan_amount, LenderName2)) ,
+      merge3 <- merge(zillow5, select(hmda4, c(id_number, loan_amount, LenderName2, sequence_num, respondent_id_prop)) ,
                       by.x = c("id_number", "loan_amount", "LenderName2"),
                       by.y = c("id_number", "loan_amount", "LenderName2"))
       
@@ -744,9 +837,7 @@ for(i in 1:length(state.id)){
       #rm(zillow5)
       
       # Filter out repeated values
-      final.merge <- distinct(final.merge, 
-                              ImportParcelID, TransId, SalesPriceAmount, 
-                              RecordingDate, LoanAmount, .keep_all = TRUE)
+      final.merge <- distinct(final.merge, id_number, loan_amount, LenderName, sequence_num, .keep_all = TRUE)
       
       final.merge <- as.data.table(final.merge)
       final.merge$COUNTYFP10 <- final.merge$FIPS <- final.merge$id_number <- NULL
@@ -765,10 +856,10 @@ for(i in 1:length(state.id)){
         year = c(year.id[[j]]),
         numb_trans = c(numbtrans),
         numb_trans_loans = c(numbtransloans ),
-        numb_trans_loans_matched = c(numbtransloansmatch )
+        numb_trans_loans_matched = c(nrow(final.merge))
         
       )
-      
+      print(mergestats_all_hmda2)
       mergestats_all_hmda <- rbind(mergestats_all_hmda, mergestats_all_hmda2)
       
       
@@ -780,7 +871,8 @@ for(i in 1:length(state.id)){
       
       final$STATEFP <- final$COUNTYFP <- final$TRACTCE90  <- NULL
       final$COUNTY <- final$TRACT <- final$n.x <- final$n.y <- NULL
-      rm(hmda_nextyr)
+      rm(list=setdiff(ls(), c("lendername_dictionary", 'final.merge', 'final', 'mergestats_all_hmda', 'database', 'hmda_database', 'hmdadatabase', 'pinfo', 
+      'maintranstab', 'tracts1990', 'tracts2000', 'tracts2010', 'tracts2015', 'zillowSQL1_con', 'year.id', 'j', 'i', 'state.id', 'buildfromdisk')))
       }
       }
 
