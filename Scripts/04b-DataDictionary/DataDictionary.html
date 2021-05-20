@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Data Dictionary</title>
+    <meta charset="utf-8" />
+    <script src="DataDictionary_files/header-attrs-2.8/header-attrs.js"></script>
+    <link href="DataDictionary_files/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="DataDictionary_files/remark-css-0.0.1/metropolis.css" rel="stylesheet" />
+    <link href="DataDictionary_files/remark-css-0.0.1/metropolis-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="my-css.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Data Dictionary
+## Explanation of Important Variables included in Toy Dataset
+
+---
+
+class: clear
+
+
+
+Let's take a look at the summary of our toy data
+
+
+```
+#&gt;   sequence_num     respondent_id_prop ImportParcelID     PropertyLandUseStndCode
+#&gt;  Min.   :1000060   Min.   :1.00e+10   Min.   :8.90e+06   Length:33411           
+#&gt;  1st Qu.:1138342   1st Qu.:1.00e+10   1st Qu.:1.12e+07   Class :character       
+#&gt;  Median :1259346   Median :2.00e+10   Median :1.20e+07   Mode  :character       
+#&gt;  Mean   :1405396   Mean   :4.34e+10   Mean   :1.26e+07                          
+#&gt;  3rd Qu.:1574343   3rd Qu.:9.00e+10   3rd Qu.:1.29e+07                          
+#&gt;  Max.   :3141165   Max.   :9.00e+10   Max.   :1.70e+08                          
+#&gt;                                                                                 
+#&gt;  SalesPriceAmount    loan_amount    RecordingDate        InitialInterestRate
+#&gt;  Min.   :3.64e+03   Min.   :    1   Min.   :2005-01-03   Min.   : 0.000     
+#&gt;  1st Qu.:2.50e+05   1st Qu.:  211   1st Qu.:2007-08-15   1st Qu.: 0.000     
+#&gt;  Median :3.90e+05   Median :  326   Median :2010-07-15   Median : 0.000     
+#&gt;  Mean   :5.21e+05   Mean   :  406   Mean   :2010-02-14   Mean   : 0.978     
+#&gt;  3rd Qu.:6.06e+05   3rd Qu.:  485   3rd Qu.:2012-05-16   3rd Qu.: 0.000     
+#&gt;  Max.   :1.54e+08   Max.   :78929   Max.   :2016-12-30   Max.   :11.600     
+#&gt;                                                          NA's   :1          
+#&gt;     TransId           YearBuilt    BuildingAreaSqFt PropertyCity       TotalBedrooms  
+#&gt;  Min.   :6.96e+05   Min.   :1824   Min.   :     1   Length:33411       Min.   : 0.00  
+#&gt;  1st Qu.:6.61e+06   1st Qu.:1949   1st Qu.:  1138   Class :character   1st Qu.: 2.00  
+#&gt;  Median :7.73e+06   Median :1965   Median :  1524   Mode  :character   Median : 3.00  
+#&gt;  Mean   :2.32e+07   Mean   :1967   Mean   :  1891                      Mean   : 3.22  
+#&gt;  3rd Qu.:4.84e+07   3rd Qu.:1990   3rd Qu.:  2122                      3rd Qu.: 4.00  
+#&gt;  Max.   :4.11e+08   Max.   :2019   Max.   :346537                      Max.   :72.00  
+#&gt;                     NA's   :422    NA's   :783                         NA's   :65     
+#&gt;  TotalCalculatedBathCount applicant_race_1    income          applicant_ethnicity
+#&gt;  Min.   : 0.00            Min.   :1.0      Length:33411       Min.   :1.0        
+#&gt;  1st Qu.: 2.00            1st Qu.:5.0      Class :character   1st Qu.:2.0        
+#&gt;  Median : 2.00            Median :5.0      Mode  :character   Median :2.0        
+#&gt;  Mean   : 2.37            Mean   :4.5                         Mean   :1.9        
+#&gt;  3rd Qu.: 3.00            3rd Qu.:5.0                         3rd Qu.:2.0        
+#&gt;  Max.   :49.00            Max.   :7.0                         Max.   :4.0        
+#&gt;  NA's   :140                                                                     
+#&gt;  census_tract       rate_spread        applicant_sex  WFPC_risk2018   WFPC_risk2012  
+#&gt;  Length:33411       Length:33411       Min.   :1.00   Min.   :    0   Min.   :    0  
+#&gt;  Class :character   Class :character   1st Qu.:1.00   1st Qu.:    0   1st Qu.:    0  
+#&gt;  Mode  :character   Mode  :character   Median :1.00   Median :    0   Median :    0  
+#&gt;                                        Mean   :1.42   Mean   :   94   Mean   :  273  
+#&gt;                                        3rd Qu.:2.00   3rd Qu.:    0   3rd Qu.:   20  
+#&gt;                                        Max.   :4.00   Max.   :23972   Max.   :50063  
+#&gt;                                                       NA's   :21                     
+#&gt;    wuiflag90       wuiflag00       wuiflag10       elevation     
+#&gt;  Min.   :0.000   Min.   :0.000   Min.   :0.000   Min.   : -16.9  
+#&gt;  1st Qu.:0.000   1st Qu.:0.000   1st Qu.:0.000   1st Qu.:  41.1  
+#&gt;  Median :0.000   Median :0.000   Median :0.000   Median : 115.0  
+#&gt;  Mean   :0.297   Mean   :0.292   Mean   :0.295   Mean   : 212.3  
+#&gt;  3rd Qu.:1.000   3rd Qu.:1.000   3rd Qu.:1.000   3rd Qu.: 254.2  
+#&gt;  Max.   :1.000   Max.   :1.000   Max.   :1.000   Max.   :2542.1  
+#&gt; 
+```
+---
+
+The variables `sequence_num`, `respondent_id`, `TransID` and `ImportParcelID` are just what is used to identify unique loans/loaners/transactions/properties respectively.
+
+Many of the variables included are self-explanatory, but a few are less so. As a note **zillow derived data** are in dollars, whereas **hmda derived data** are in thousands of dollars.
+
+Main point of above - `SalesPriceAmount` is from ztrax, and is sale amount in dollars, while `loan_amount` and `income`  are in thousands of dollars. The above issue should otherwise not be an issue.
+
+A few variables are sort of inscrutable, let's go through these in a list.
+
+`PropertyLandUseStndCode` - this is a ztrax variable that indicates land use. The data has been pre-cleaned to the following types of data - here is the mapping.
+
+- 'RR101', **SFR**
+- 'RR999', **Inferred SFR**
+- 'RR102', **Rural Residence**   (includes farm/productive land?)
+- 'RR104', **Townhouse**
+- 'RR105', **Cluster Home**
+- 'RR106', **Condominium**
+- 'RR107', **Cooperative**
+- 'RR108',  **Row House**
+- 'RR109', **Planned Unit Development**
+- 'RR113', **Bungalow**
+- 'RR116', **Patio Home**
+- 'RR119', **Garden Home**
+- 'RR120' **Landominium**
+
+---
+
+`applicant_ethnicity` and `applicant_race` are categorical variables that code an applicant's race or ethnicity. These come with a list of code-mappings.
+
+### Ethnicity
+
+- 1 - Hispanic or Latino
+- 2 - Not Hispanic or Latino
+- 3 - Information not Provided
+- 4 - Not applicable
+- 5 - No co-applicant (not relevant for us)
+
+### Race
+
+- 1 - American Indian or Alaskan Native
+- 2 - Asian
+- 3 - Black or African American
+- 4 - Native Hawaiian or other Pacific Islander
+- 5 - White
+- 6 - Information not Provided
+- 7 - Not applicable
+- 8 - No co-applicant (not relevant)
+
+---
+
+## Hedonic Variables
+
+I have also included a set of potentially useful hedonic/property characteristic variables. One of note is `elevation` which is in meters, and is the elevation of the point location of the property.
+
+Square footage, bedrooms, year of home construction and bathrooms are also provided.
+
+Location can be found through the `census_tracts` variable.
+
+## Fire Risk Variables
+
+There are a few different measures of fire risk available for analysis, depending on preference.
+
+- **WFPC** (either 2012 or 2018) - this is the wildfire potential variable. Most observations will have a value of 0 - but there are some significantly larger levels. From experience, running regressions with logged values of this work better, but I'm not sure if that applies for a sorting analysis.
+
+- **wuiflag** (available for 1990, 2000, and 2010) - this is a binary variable for if the home's point location is in the wildland-urban-interface, as decided in 1990, 2000 or 2010 respectively.
+
+---
+
+Let me know if you need any more information
+
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "8.5:11",
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
