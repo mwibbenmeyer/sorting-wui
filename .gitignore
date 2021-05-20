@@ -1,5 +1,3 @@
-**/Raw_data
-**/RAW
 !*/download_raw_files.sh
 *.Rproj
 *.Rhistory
