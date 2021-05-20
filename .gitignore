@@ -3,3 +3,9 @@
 !*/download_raw_files.sh
 *.Rproj
 *.Rhistory
+
+*.dta
+*.rds
+*.csv
+
+**/intermediateData

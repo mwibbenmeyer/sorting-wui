@@ -1,0 +1,122 @@
+---
+title: "Data Dictionary"
+subtitle: "Explanation of Important Variables included in Toy Dataset"
+#author: "Connor Lennon"
+#date: "5/15"
+output:
+  xaringan::moon_reader:
+    css: ['default', 'metropolis', 'metropolis-fonts', 'my-css.css']
+    # self_contained: true
+    nature:
+      ratio: '8.5:11'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+class: clear
+```{r, setup, include = F}
+# Knitr options
+library(knitr)
+opts_chunk$set(
+  comment = "#>",
+  fig.align = "center",
+  fig.height = 7,
+  fig.width = 10.5,
+  warning = F,
+  message = F
+)
+opts_chunk$set(dev = "svg")
+options(device = function(file, width, height) {
+  svg(tempfile(), width = width, height = height)
+})
+options(digits = 4)
+options(width = 90)
+```
+
+
+Let's take a look at the summary of our toy data
+
+```{r, echo = F}
+library(pacman)
+p_load(tidyverse, skimr, haven)
+
+read_dta('ztrax_hmda_data_CA.dta') %>% summary()
+
+```
+---
+
+The variables `sequence_num`, `respondent_id`, `TransID` and `ImportParcelID` are just what is used to identify unique loans/loaners/transactions/properties respectively.
+
+Many of the variables included are self-explanatory, but a few are less so. As a note **zillow derived data** are in dollars, whereas **hmda derived data** are in thousands of dollars.
+
+Main point of above - `SalesPriceAmount` is from ztrax, and is sale amount in dollars, while `loan_amount` and `income`  are in thousands of dollars. The above issue should otherwise not be an issue.
+
+A few variables are sort of inscrutable, let's go through these in a list.
+
+`PropertyLandUseStndCode` - this is a ztrax variable that indicates land use. The data has been pre-cleaned to the following types of data - here is the mapping.
+
+- 'RR101', **SFR**
+- 'RR999', **Inferred SFR**
+- 'RR102', **Rural Residence**   (includes farm/productive land?)
+- 'RR104', **Townhouse**
+- 'RR105', **Cluster Home**
+- 'RR106', **Condominium**
+- 'RR107', **Cooperative**
+- 'RR108',  **Row House**
+- 'RR109', **Planned Unit Development**
+- 'RR113', **Bungalow**
+- 'RR116', **Patio Home**
+- 'RR119', **Garden Home**
+- 'RR120' **Landominium**
+
+---
+
+`applicant_ethnicity` and `applicant_race` are categorical variables that code an applicant's race or ethnicity. These come with a list of code-mappings.
+
+### Ethnicity
+
+- 1 - Hispanic or Latino
+- 2 - Not Hispanic or Latino
+- 3 - Information not Provided
+- 4 - Not applicable
+- 5 - No co-applicant (not relevant for us)
+
+### Race
+
+- 1 - American Indian or Alaskan Native
+- 2 - Asian
+- 3 - Black or African American
+- 4 - Native Hawaiian or other Pacific Islander
+- 5 - White
+- 6 - Information not Provided
+- 7 - Not applicable
+- 8 - No co-applicant (not relevant)
+
+---
+
+## Hedonic Variables
+
+I have also included a set of potentially useful hedonic/property characteristic variables. One of note is `elevation` which is in meters, and is the elevation of the point location of the property.
+
+Square footage, bedrooms, year of home construction and bathrooms are also provided.
+
+Location can be found through the `census_tracts` variable.
+
+## Fire Risk Variables
+
+There are a few different measures of fire risk available for analysis, depending on preference.
+
+- **WFPC** (either 2012 or 2018) - this is the wildfire potential variable. Most observations will have a value of 0 - but there are some significantly larger levels. From experience, running regressions with logged values of this work better, but I'm not sure if that applies for a sorting analysis.
+
+- **wuiflag** (available for 1990, 2000, and 2010) - this is a binary variable for if the home's point location is in the wildland-urban-interface, as decided in 1990, 2000 or 2010 respectively.
+
+---
+
+Let me know if you need any more information
+
+```{r, print pdfs, echo = F, eval = F}
+pagedown::chrome_print(
+  input = "DataDictionary.html",
+  timeout = 60
+)
+```
