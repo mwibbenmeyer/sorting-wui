@@ -11,11 +11,11 @@ RPostgres,
 sqldf,
 readr, 
 dplyr,
-data.table)
+data.table, magrittr, lubridate)
 
 ###
 #what is the source ids we want information on, it lives ->>>
-source_data_path <- "/home/connor/Desktop/rfffiles/wui-afri/hmda_ztrax_merge_330.dta"
+source_data_path <- "merged_data_withcov_919.csv"
 
 ## set up logs
 logdir = paste0('log_file_name_match_', Sys.Date(), '.log')
@@ -37,7 +37,7 @@ opt_parser = OptionParser(option_list=option_list)
 #zillowdbloc = rstudioapi::askForPassword('Where does your zillow database live? Please enter a full filepath.')
 #This is where mine lives
 #zillowdbloc = '/media/connor/T7/database_ztrax/sortingwui_ztrax'
-zillowdbloc = 'wui-afri/sortingwui_ztrax'
+zillowdbloc = '/home/connor/Desktop/rfffiles/wui-afri/sortingwui_ztrax'
 raw_ztrax_text_file_location = '/wui-afri/ztrans/' # if necessary - fullpath lives /home/connor/Desktop/rfffiles
 
 # other locations - 
@@ -57,12 +57,12 @@ colnames_sellername = layoutZTrans[layoutZTrans$TableName == 'utSellerName', 'Fi
 colnames_buyername = layoutZTrans[layoutZTrans$TableName == 'utBuyerName', 'FieldName']
 
 ## read tables - this call appears to be consistent with the less-efficient read.txt call
-seller_name = fread("SellerName.txt", sep = '|', header = FALSE, stringsAsFactors = FALSE, quote = "", col.names = colnames_sellername$FieldName)
+seller_name = fread("/home/connor/Desktop/rfffiles/wui-afri/SellerName.txt", sep = '|', header = FALSE, stringsAsFactors = FALSE, quote = "", col.names = colnames_sellername$FieldName)
 buyer_name = fread("/home/connor/Desktop/rfffiles/wui-afri/BuyerName.txt", sep = '|', header = FALSE, stringsAsFactors = FALSE, quote = "", col.names = colnames_buyername$FieldName)
 
 ## we need a source dataset to start with. Primarily, a set of names linked to transactions and past transactions. REALLY however, we just need the source IDs and the
 ## rest can be built from scratch
-merge_source = haven::read_dta(source_data_path)
+merge_source = vroom::vroom(source_data_path)
 merge_source_ids = merge_source %>% dplyr::select(TransId) %>% unique()
 
 
@@ -101,7 +101,14 @@ seller_name_direct_match = merge(seller_name_direct_match, tbl(database, 'transM
 seller_name_direct_match = merge(seller_name_direct_match, tbl(database, 'ztrax_view') %>%
                                    dplyr::select(TransId,AssessmentLandUseStndCode), by.x = 'TransId_origin', by.y = 'TransId', suffixes = c("", "_origin"))
 
+# keep parcel ids in a list, along with date of transaction to exclude all other transactions involving that parcel within 3 years
+seller_name_importparcelid_exclusion <- seller_name_direct_match %>% dplyr::select(ImportParcelID_origin, TransId_origin) unique()
 
+# find transids from TransMain that match the parcel ids and are within 3 years of the transaction date in RecordingDate_origin
+transid_exclusion_list <- dplyr::inner_join(seller_name_importparcelid_exclusion,tbl(database, 'transMain') |> select(TransId, RecordingDate), on = c('TransId_origin' = 'TransId'), suffix = c("", "_origin")) |> mutate(check_date_origin = as_date(RecordingDate))
+
+transid_exclusion_list <- dplyr::inner_join(tbl(database, 'transMain') |> select(TransId, RecordingDate, ImportParcelID),seller_name_importparcelid_exclusion |> select(check_date_origin, ImportParcelID_origin), on = c('ImportParcelID' = 'ImportParcelID_origin')) |> mutate(check_date = as_date(RecordingDate)) |> 
+  filter(check_date >= (check_date_origin - years(3)) & check_date <= check_date_origin + years(3)) # filter to all TransIds with a check_date within 3 years of check_date_origin
 
 ## now we need to repeat steps above, but in reverse. Tricky part here is to ensure your initial match 
 
@@ -162,7 +169,7 @@ rm(seller_name_direct_match)
 
 # path is identical to type 1, except we need to construct a name field to match on
 
-buyer_name_subset_2 = buyer_name %>% filter(TransId %in% (merge_source_ids$TransId %>% as.numeric() %>% unique())) %>% filter(TransId %nin% unique(direct_match_trans))
+buyer_name_subset_2 = buyer_name %>% filter(TransId %in% (merge_source_ids$TransId %>% as.numeric() %>% unique())) %>% filter(TransId %nin% unique(direct_match_trans)) |> filter(TransId %nin% unique(transid_exclusion_list$TransId))
 
 buyer_name_subset_2 = buyer_name_subset_2  %>% mutate(BuyerFirstLast = paste0(word(BuyerIndividualFullName, 1),' ', BuyerLastName)) %>% mutate(fst_filtervar = paste0(BuyerFirstLast, TransId)) %>% 
   dplyr::filter(BuyerIndividualFullName %nin% unique(buyer_name_matches))
@@ -197,6 +204,17 @@ seller_name_match = merge(seller_name_match, tbl(database, 'transMain') %>%
                             dplyr::select(TransId,SalesPriceAmount,RecordingDate,DocumentDate)  %>% 
                             mutate(RecordingDate = ifelse(is.na(RecordingDate), DocumentDate, RecordingDate))%>% filter(!is.na(SalesPriceAmount)), 
                           by.x = 'TransId_origin', by.y = 'TransId', suffixes = c("", "_origin"))
+
+
+# keep parcel ids in a list, along with date of transaction to exclude all other transactions involving that parcel within 3 years
+seller_name_importparcelid_exclusion <- seller_name_match %>% dplyr::select(ImportParcelID_origin, TransId_origin) unique()
+
+# find transids from TransMain that match the parcel ids and are within 3 years of the transaction date in RecordingDate_origin
+transid_exclusion_list_2 <- dplyr::inner_join(seller_name_importparcelid_exclusion,tbl(database, 'transMain') |> select(TransId, RecordingDate), on = c('TransId_origin' = 'TransId'), suffix = c("", "_origin")) |> mutate(check_date_origin = as_date(RecordingDate))
+
+transid_exclusion_list <- bind_rows(transid_exclusion_list, dplyr::inner_join(tbl(database, 'transMain') |> select(TransId, RecordingDate, ImportParcelID),seller_name_importparcelid_exclusion |> select(check_date_origin, ImportParcelID_origin), on = c('ImportParcelID' = 'ImportParcelID_origin')) |> mutate(check_date = as_date(RecordingDate)) |> 
+  filter(check_date >= (check_date_origin - years(3)) & check_date <= check_date_origin + years(3))) # filter to all TransIds with a check_date within 3 years of check_date_origin
+
 
 ###
 buyer_name_origin = buyer_name %>% filter(TransId %in% unique(seller_name_match$TransId_origin)) %>% distinct(TransId, BuyerIndividualFullName, .keep_all = TRUE)
@@ -239,13 +257,20 @@ rm(seller_name_match)
 
 # path is identical to type 1/2, except we need to construct a name field to match on. Stick with firstlast format for ease of later merging.
 
-buyer_name_subset_2 = buyer_name %>% filter(TransId %in% (merge_source_ids$TransId %>% as.numeric() %>% unique())) %>% filter(TransId %nin% direct_match_trans)%>% filter(TransId %nin% slr_transid1)
-buyer_name_subset_2 = buyer_name_subset_2  %>% mutate(BuyerFirstLast = paste0(substr(word(BuyerIndividualFullName, 1), 1, 1),' ' ,str_sub(word(BuyerIndividualFullName, 2), start=1, end=1),' ', BuyerLastName))
-seller_name_match = seller_name %>% filter(SellerIndividualFullName != '') %>% filter(SellerIndividualFullName %nin% buyer_name_matches) %>% 
+buyer_name_subset_2 = buyer_name %>% filter(TransId %in% (merge_source_ids$TransId %>% as.numeric() %>% unique())) %>% filter(TransId %nin% direct_match_trans)%>% 
+filter(TransId %nin% slr_transid1) |> 
+filter(TransId %nin% unique(transid_exclusion_list$TransId))
+
+buyer_name_subset_2 = buyer_name_subset_2 %>% 
+  mutate(BuyerFirstLast = paste0(str_sub(word(BuyerIndividualFullName, 1), start=1, end=1), ' ', 
+                                  str_sub(word(BuyerIndividualFullName, 2:length(strsplit(BuyerIndividualFullName, " ")[[1]])), start=1, end=1), ' ', 
+                                  BuyerLastName))
   mutate(SellerFirstLast = paste0(str_sub(word(SellerIndividualFullName, 1), start=1, end=1),' ',str_sub(word(SellerIndividualFullName, 2), start=1, end=1),' ', SellerLastName))
+  seller_name_match = seller_name %>% filter(SellerIndividualFullName != '') %>% filter(SellerIndividualFullName %nin% buyer_name_matches) %>% 
+    mutate(SellerFirstLast = paste0(strsplit(SellerIndividualFullName, " ")[[1]] %>% sapply(substr, 1, 1) %>% paste0(collapse = " "), ' ', SellerLastName))
 
 rm(seller_name, buyer_name) ## can sometimes save you in memory overflows
-
+gc()
 seller_name_match = merge(buyer_name_subset_2 %>% filter(BuyerIndividualFullName != ""), seller_name_match, by.x = "BuyerFirstLast", by.y = "SellerFirstLast", all.x = TRUE, all.y = FALSE, suffixes = c("", "_origin"), allow.cartesian = TRUE)
 
 seller_name_match = seller_name_match %>% filter(!is.na(TransId_origin))
